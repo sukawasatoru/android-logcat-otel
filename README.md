@@ -27,7 +27,8 @@ Usage
 | timestamp>=$__from and timestamp<=$__to
 | tag=`ActivityManager`
 |= `Start proc` or `Killing`
-| line_format "[unixToTime .timestamp | date `2006-01-02 15:04:05.000`}} JST] {{__line__}}"
+| line_format "[{{
+unixToTime .timestamp | date `2006-01-02 15:04:05.000`}} JST] {{__line__}}"
 ```
 
 LICENSE
