@@ -3,6 +3,7 @@ use android_logcat_otel::model::LogcatLine;
 use android_logcat_otel::prelude::*;
 use clap::Parser;
 use reqwest::Client;
+use std::io::ErrorKind;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::signal::ctrl_c;
 use tokio::sync::oneshot::error::TryRecvError;
@@ -41,7 +42,18 @@ async fn main() -> Fallible<()> {
             }
 
             buf.clear();
-            stdout.read_line(&mut buf).await.expect("read line");
+            if let Err(e) = stdout.read_line(&mut buf).await {
+                match e.kind() {
+                    ErrorKind::InvalidData => {
+                        info!(?e, buf, "ignore not valid utf-8");
+                        continue;
+                    }
+                    _ => {
+                        warn!(?e, "failed to read line");
+                        break;
+                    }
+                }
+            }
             if buf.is_empty() {
                 match child.try_wait() {
                     Ok(Some(data)) => {
