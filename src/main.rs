@@ -6,6 +6,7 @@ use reqwest::Client;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::signal::ctrl_c;
 use tokio::sync::oneshot::error::TryRecvError;
+use tokio::task::yield_now;
 use url::Url;
 
 #[derive(Parser)]
@@ -42,8 +43,21 @@ async fn main() -> Fallible<()> {
             buf.clear();
             stdout.read_line(&mut buf).await.expect("read line");
             if buf.is_empty() {
-                debug!("continue");
-                continue;
+                match child.try_wait() {
+                    Ok(Some(data)) => {
+                        warn!(?data, "adb already exited");
+                        debug!("end adb thread");
+                        return;
+                    }
+                    Ok(None) => {
+                        debug!("continue");
+                        continue;
+                    }
+                    Err(e) => {
+                        error!(?e, "error attempting to wait");
+                        break;
+                    }
+                }
             }
             let line = match buf.parse::<LogcatLine>() {
                 Ok(data) => data,
@@ -63,6 +77,7 @@ async fn main() -> Fallible<()> {
                 "{}",
                 line.msg,
             );
+            yield_now().await;
         }
         child.kill().await.unwrap();
         debug!("end adb thread");
